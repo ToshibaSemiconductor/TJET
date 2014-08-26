@@ -32,7 +32,7 @@
 /**
  * @brief module version informations
  */
-#define DRIVER_VERSION "1.0.0";
+#define DRIVER_VERSION "1.0.1";
 
 #define NULL ((void *)0)
 

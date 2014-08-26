@@ -74,7 +74,11 @@ static T_CNL_ERR IZAN_wake(S_CNL_DEV *);
 static T_CNL_ERR IZAN_sleep(S_CNL_DEV *);
 static T_CNL_ERR IZAN_sendMngFrame(S_CNL_DEV *, u16, void *, void *);
 static T_CNL_ERR IZAN_sendData(S_CNL_DEV *, u8, u8, u32, void *);
+static T_CNL_ERR IZAN_sendDataIntUnmask(S_CNL_DEV *);
+static T_CNL_ERR IZAN_readReadyTxBuffer(S_CNL_DEV *, u32 *);
 static T_CNL_ERR IZAN_receiveData(S_CNL_DEV *, u8, u8 *, u32 *, void *);
+static T_CNL_ERR IZAN_receiveDataIntUnmask(S_CNL_DEV *);
+static T_CNL_ERR IZAN_readReadyRxBuffer(S_CNL_DEV *, u32 *, u8);
 
 // HW access function for scheduler and state machine 
 static T_CNL_ERR IZAN_readReadyPid(S_CNL_DEV *, u8 *);
@@ -117,7 +121,6 @@ static T_CNL_ERR IZAN_initializePMU(S_CNL_DEV *);
 static T_CNL_ERR IZAN_initializePHY(S_CNL_DEV *);
 static T_CNL_ERR IZAN_initializeRF(S_CNL_DEV *);
 static T_CNL_ERR IZAN_initializeSPI(S_CNL_DEV *);
-static T_CNL_ERR IZAN_loadE2PROM(S_CNL_DEV *);
 static T_CNL_ERR IZAN_initializeCNL(S_CNL_DEV *);
 static T_CNL_ERR IZAN_initializeDevice(S_CNL_DEV *);
 static T_CNL_ERR IZAN_setupTimer(S_CNL_DEV *);
@@ -179,7 +182,11 @@ static S_CNL_DEVICE_OPS g_cnlDeviceOps = {
     .pSleep             = IZAN_sleep,
     .pSendMngFrame      = IZAN_sendMngFrame,
     .pSendData          = IZAN_sendData,
+    .pSendDataIntUnmask = IZAN_sendDataIntUnmask,
+    .pReadReadyTxBuffer = IZAN_readReadyTxBuffer,
     .pReceiveData       = IZAN_receiveData,
+    .pReceiveDataIntUnmask = IZAN_receiveDataIntUnmask,
+    .pReadReadyRxBuffer = IZAN_readReadyRxBuffer,
 
     // call from scheduler or statemachine functions.
     .pReadReadyPid      = IZAN_readReadyPid,
@@ -239,16 +246,18 @@ static u32 g_monaddr[] =
     REG_RXEVM,                      // 0x1437C
     REG_TXRATEDOWNNUM,              // 0x143B0
     REG_TXRATEUPNUM,                // 0x143B4
-    0x14480,                        // 0x14480
-    0x14484,                        // 0x14484
-    0x14488,                        // 0x14488
-    0x1448C,                        // 0x1448C
-    0x14490,                        // 0x14490
-    0x14494,                        // 0x14494
-    0x14498,                        // 0x14498
-    0x1449C,                        // 0x1449C
-    0x144A0,                        // 0x144A0
-    0x144A4,                        // 0x144A4
+
+    REG_ZA_0x14480,                 // 0x14480
+    REG_ZA_0x14484,                 // 0x14484
+    REG_ZA_0x14488,                 // 0x14488
+    REG_ZA_0x1448C,                 // 0x1448C
+    REG_ZA_0x14490,                 // 0x14490
+    REG_ZA_0x14494,                 // 0x14494
+    REG_ZA_0x14498,                 // 0x14498
+    REG_ZA_0x1449C,                 // 0x1449C
+    REG_ZA_0x144A0,                 // 0x144A0
+    REG_ZA_0x144A4,                 // 0x144A4
+
 // rx info read monitor registers.
     REG_PHY_RXCOUNT_EDGEDET,                // 0x15044
     REG_PHY_RXCOUNT_HEADDET,                // 0x15048
@@ -1460,13 +1469,13 @@ static T_CNL_ERR IZAN_setCROSCTrim(S_CNL_DEV *pCnlDev, u16 trm)
     pDev = pCnlDev->pDev;
 
     writeValue = (u8)(trm & 0x000F);
-    retval = IZAN_writeRegister(pDev, 0x01915, 1, &writeValue);
+    retval = IZAN_writeRegister(pDev, REG_ZA_0x01915, 1, &writeValue);
     if(retval != CNL_SUCCESS) {
         return retval;
     }
 
     writeValue = 0x00;
-    retval = IZAN_writeRegister(pDev, 0x01916, 1, &writeValue);
+    retval = IZAN_writeRegister(pDev, REG_ZA_0x01916, 1, &writeValue);
     if(retval != CNL_SUCCESS) {
         return retval;
     }
@@ -1475,7 +1484,7 @@ static T_CNL_ERR IZAN_setCROSCTrim(S_CNL_DEV *pCnlDev, u16 trm)
     CMN_delayTask(1);
 
     writeValue = 0x01;
-    retval = IZAN_writeRegister(pDev, 0x01914, 1, &writeValue);
+    retval = IZAN_writeRegister(pDev, REG_ZA_0x01914, 1, &writeValue);
     if(retval != CNL_SUCCESS) {
         return retval;
     }
@@ -1537,25 +1546,6 @@ static T_CNL_ERR IZAN_pollMSRResult(S_CNL_DEV *pCnlDev, u16 *pResultValue)
 
     DBG_INFO("[DEBUG] get CRMSRRSLT -> 0x%x\n", *pResultValue);
 
-    return CNL_SUCCESS;
-}
-
-
-/*-------------------------------------------------------------------
- * Function : IZAN_loadE2PROM
- *-----------------------------------------------------------------*/
-/**
- * load data from E2PROM
- * @param  pCnlDev : the pointer to the CNL device.
- * @return CNL_SUCCESS      (normally completion)
- * @return CNL_ERR_HOST_IO  (HostI/O failed)
- * @return CNL_ERR_HW_PROT  (HW protocol error)
- * @note   
- */
-/*-----------------------------------------------------------------*/
-static T_CNL_ERR
-IZAN_loadE2PROM(S_CNL_DEV *pCnlDev)
-{
     return CNL_SUCCESS;
 }
 
@@ -4057,6 +4047,15 @@ IZAN_sleep(S_CNL_DEV *pCnlDev)
         goto COMPLETE;
     }
 
+    //
+    //
+    DBG_INFO("IZAN sleep : get SRCHDMTTIM0(0x%x)\n", REG_SRCHDMTTIM0);
+    retval = IZAN_readRegister(pDev, REG_SRCHDMTTIM0, 4, &intst);
+    if(retval != CNL_SUCCESS) {
+        DBG_ERR("IZAN sleep : get SRCHHDMTTIM0(0x%x) failed[%d].\n", REG_SRCHDMTTIM0, retval);
+        goto COMPLETE;
+    }
+
     // change to powersave immediately,
     pDeviceData->pmuState = PMU_POWERSAVE;
 
@@ -4338,7 +4337,6 @@ IZAN_sendData(S_CNL_DEV *pCnlDev,
 
     T_CNL_ERR  retval;
     void      *pDev;
-    u32        unmask;
     u8         cnt;
     u32        txInfo[IZAN_TX_CSDU_NUM];
 
@@ -4356,7 +4354,6 @@ IZAN_sendData(S_CNL_DEV *pCnlDev,
     // 1. write TXDATAINFO.
     // 2. write data to TXFIFO.(writeDMA)
     // 3. if write data is not 4096 * n, put TxFIFO address to head.
-    // 4. enable interrupt if necessary.
     //
 
     // 0.
@@ -4386,11 +4383,34 @@ IZAN_sendData(S_CNL_DEV *pCnlDev,
         }
     }
 
-    // 4.
+    return CNL_SUCCESS;
+}
+
+
+/*-------------------------------------------------------------------
+ * Function : IZAN_sendDataIntUnmask
+ *-----------------------------------------------------------------*/
+/**
+ * enable send interrupt.
+ * @param  pCnlDev    : the pointer to the S_CNL_DEV
+ * @return CNL_SUCCESS      (normally completion)
+ * @return CNL_ERR_HOST_IO  (HostI/O failed)
+ * @note   
+ */
+/*-----------------------------------------------------------------*/
+static T_CNL_ERR
+IZAN_sendDataIntUnmask(S_CNL_DEV *pCnlDev)
+{
+
+    T_CNL_ERR  retval;
+    u32        unmask;
+
+
+    // enable interrupt.
     unmask = INT_TXBANKEMPT | INT_TXDFRAME;
     retval = IZAN_addIntUnmask(pCnlDev, unmask);
     if(retval != CNL_SUCCESS) {
-        DBG_ERR("SendData : add IntUnmask failed[%d].\n", retval);
+        DBG_ERR("SendDataIntUnmask : add IntUnmask failed[%d].\n", retval);
         return retval;
     }
 
@@ -4424,7 +4444,6 @@ IZAN_receiveData(S_CNL_DEV *pCnlDev,
     T_CNL_ERR           retval;
     void               *pDev;
     S_IZAN_DEVICE_DATA *pDeviceData;
-    u32                 unmask;
     u32                 length, remain;
     u32                 readdone, rewind;
     u8                  frag;
@@ -4439,7 +4458,6 @@ IZAN_receiveData(S_CNL_DEV *pCnlDev,
     //
     // 1. read data from RXFIFO.(if failed, do REWIND)
     // 2. if read data is completed, set READDONE
-    // 3. enable interrupt
     //
     
     remain = pDeviceData->rxRemain;
@@ -4497,45 +4515,6 @@ IZAN_receiveData(S_CNL_DEV *pCnlDev,
         return retval;
     }
 
-
-   // 3.
-    {
-        u32                rxbanksta;
-        u32                rxbankcnt;
-        S_CNL_DEVICE_EVENT event;
-
-        retval = IZAN_readRegister(pDev, REG_RXBANKSTA, 4, &rxbanksta);
-        if(retval != CNL_SUCCESS) {
-            DBG_ERR(" : read RXBANKSTA failed[%d].\n", retval);
-            return retval;
-        }
-        if (IZAN_readRxvgagain(pCnlDev) != CNL_SUCCESS) {
-            DBG_ERR("ReceiveData : read RXVGAGAIN failed.\n");
-        }
-
-        rxbankcnt = CMN_LE2H32(rxbanksta) & 0x0000000F;
-
-        if(rxbankcnt > 0) {
-            DBG_INFO("=======> RXBANKCNT = %d \n", rxbankcnt);
-            CMN_MEMSET(&event, 0x00, sizeof(S_CNL_DEVICE_EVENT));
-            event.type |= CNL_EVENT_RX_READY;
-            CNL_addEvent(pCnlDev, &event); 
-        } else {
-
-            CMN_MEMSET(&event, 0x00, sizeof(S_CNL_DEVICE_EVENT));
-            event.type |= CNL_EVENT_RX_READY;
-            CNL_clearEvent(pCnlDev, &event); 
-
-            // 3.
-            unmask = INT_RXBANKNOTEMPT;
-            retval = IZAN_addIntUnmask(pCnlDev, unmask);
-            if(retval != CNL_SUCCESS) {
-                DBG_ERR("ReceiveData : add IntUnmask failed[%d].\n", retval);
-                return retval;
-            }
-        }
-    }
-
     // store return parameters.
     *pLength   = length;
     *pFragment = frag;
@@ -4560,6 +4539,68 @@ IZAN_receiveData(S_CNL_DEV *pCnlDev,
             return retval;
         }
         pDeviceData->rxNeedReset = FALSE;
+    }
+
+    return CNL_SUCCESS;
+}
+
+
+/*-------------------------------------------------------------------
+ * Function : IZAN_receiveDataIntUnmask.
+ *-----------------------------------------------------------------*/
+/**
+ * enable receive interrupt.
+ * @param  pCnlDev    : the pointer to the S_CNL_DEV
+ * @return CNL_SUCCESS      (normally completion)
+ * @return CNL_ERR_HOST_IO  (HostI/O failed)
+ * @note   
+ */
+/*-----------------------------------------------------------------*/
+static T_CNL_ERR
+IZAN_receiveDataIntUnmask(S_CNL_DEV *pCnlDev)
+{
+
+    T_CNL_ERR           retval;
+    void               *pDev;
+    u32                 unmask;
+
+    pDev = pCnlDev->pDev;
+
+    {
+        u32                rxbanksta;
+        u32                rxbankcnt;
+        S_CNL_DEVICE_EVENT event;
+
+        retval = IZAN_readRegister(pDev, REG_RXBANKSTA, 4, &rxbanksta);
+        if(retval != CNL_SUCCESS) {
+            DBG_ERR(" : read RXBANKSTA failed[%d].\n", retval);
+            return retval;
+        }
+        if (IZAN_readRxvgagain(pCnlDev) != CNL_SUCCESS) {
+            DBG_ERR("ReceiveDataIntUnmask : read RXVGAGAIN failed.\n");
+        }
+
+        rxbankcnt = CMN_LE2H32(rxbanksta) & 0x0000000F;
+
+        if(rxbankcnt > 0) {
+            DBG_INFO("=======> RXBANKCNT = %d \n", rxbankcnt);
+            CMN_MEMSET(&event, 0x00, sizeof(S_CNL_DEVICE_EVENT));
+            event.type |= CNL_EVENT_RX_READY;
+            CNL_addEvent(pCnlDev, &event); 
+        } else {
+
+            CMN_MEMSET(&event, 0x00, sizeof(S_CNL_DEVICE_EVENT));
+            event.type |= CNL_EVENT_RX_READY;
+            CNL_clearEvent(pCnlDev, &event); 
+
+            // enable interrupt.
+            unmask = INT_RXBANKNOTEMPT;
+            retval = IZAN_addIntUnmask(pCnlDev, unmask);
+            if(retval != CNL_SUCCESS) {
+                DBG_ERR("ReceiveDataIntUnmask : add IntUnmask failed[%d].\n", retval);
+                return retval;
+            }
+        }
     }
 
     return CNL_SUCCESS;
@@ -4751,6 +4792,134 @@ IZAN_readReadyBuffer(S_CNL_DEV *pCnlDev,
     if (IZAN_readRxvgagain(pCnlDev) != CNL_SUCCESS) {
         DBG_ERR("ReadReadyBuffer : read RXVGAGAIN failed.\n");
     }
+
+
+    return CNL_SUCCESS;
+}
+
+
+/*-------------------------------------------------------------------
+ * Function : IZAN_readReadyTxBuffer
+ *-----------------------------------------------------------------*/
+/**
+ * read ready TX buffer length.
+ * TX : number of empty BANK count * CSDU_SIZE.
+ * @param  pCnlDev    : the pointer to the S_CNL_DEV
+ * @param  pLength    : ready buffer length.
+ * @return CNL_SUCCESS      (normally completion)
+ * @return CNL_ERR_HOST_IO  (HostI/O failed)
+ * @note 
+ */
+/*-----------------------------------------------------------------*/
+static T_CNL_ERR
+IZAN_readReadyTxBuffer(S_CNL_DEV *pCnlDev,
+                       u32       *pLength)
+{
+
+    T_CNL_ERR           retval;
+    void               *pDev;
+    u32                 banksta = 0;
+
+
+    pDev = pCnlDev->pDev;
+
+    //
+    // check ready CSDU count sequence.
+    //
+    retval = IZAN_readRegister(pDev, REG_TXBANKSTA, 4, &banksta);
+    if(retval != CNL_SUCCESS) {
+        DBG_ERR("ReadyTxBuffer : read TXBANKSTA failed[%d].\n", retval);
+        return retval;
+    }
+
+    *pLength = (u32)(IZAN_TXBANKSTA_TO_READY_CSDU(banksta) * CNL_CSDU_SIZE);
+
+    return CNL_SUCCESS;
+}
+
+
+/*-------------------------------------------------------------------
+ * Function : IZAN_readReadyRxBuffer
+ *-----------------------------------------------------------------*/
+/**
+ * read ready RX buffer length.
+ * RX : number of CSDU same PID * CSDU_SIZE - position of RX head bank.
+ * @param  pCnlDev    : the pointer to the S_CNL_DEV
+ * @param  pLength    : ready buffer length.
+ * @param  pid        : profile id.
+ * @return CNL_SUCCESS      (normally completion)
+ * @return CNL_ERR_HOST_IO  (HostI/O failed)
+ * @note 
+ */
+/*-----------------------------------------------------------------*/
+static T_CNL_ERR
+IZAN_readReadyRxBuffer(S_CNL_DEV *pCnlDev, 
+                       u32       *pLength, 
+                       u8         pid)
+{
+    T_CNL_ERR           retval;
+    void               *pDev;
+    S_IZAN_DEVICE_DATA *pDeviceData;
+    u32                 rxInfo[IZAN_RX_CSDU_NUM] = {0};
+
+    u8                  i;
+    u32                 remain;
+    u8                  frag;
+
+
+    pDev        = pCnlDev->pDev;
+    pDeviceData = IZAN_cnlDevToDeviceData(pCnlDev);
+
+    // read RXDATAINFO.
+    retval = IZAN_readRegister(pDev, REG_RXDATAINFO, 4 * IZAN_RX_CSDU_NUM, &rxInfo);
+    if(retval != CNL_SUCCESS) {
+        DBG_ERR("ReadyRxBuffer : read RXDATAINFO failed[%d].\n", retval);
+        return retval;
+    }
+
+    // check profile id.
+    if (pid != IZAN_DATAINFO_TO_PID(rxInfo[0])) {
+        DBG_ERR("ReadyRxBuffer : [current pid=%u] != [buffer pid=%u]\n", 
+            pid, IZAN_DATAINFO_TO_PID(rxInfo[0]));
+
+        *pLength = 0;
+        return CNL_SUCCESS;
+    }
+
+    remain = 0;
+    pid    = IZAN_DATAINFO_TO_PID(rxInfo[0]);
+    frag    = IZAN_DATAINFO_TO_FRAG(rxInfo[0]);
+
+    for(i=0; i<IZAN_RX_CSDU_NUM; i++) {
+        if(((CMN_LE2H32(rxInfo[i]) & 0x80000000) >> 31) == 1) {
+            if(pid != IZAN_DATAINFO_TO_PID(rxInfo[i])) {
+                // different PID data. do not add length.
+                break;
+            }
+            frag    = IZAN_DATAINFO_TO_FRAG(rxInfo[i]);
+            remain += IZAN_DATAINFO_TO_LENGTH(rxInfo[i]);
+            if(frag == CNL_NOT_FRAGMENTED_DATA) {
+                // terminal data of a data chunk, exit loop
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+
+    if((!IS_MULTI_OF_4K(remain)) && (frag == CNL_NOT_FRAGMENTED_DATA)) {
+        pDeviceData->rxNeedReset = TRUE;
+    } else {
+        pDeviceData->rxNeedReset = FALSE;
+    }
+
+    // cache these RX data information.
+    pDeviceData->rxRemain   = remain - pDeviceData->rxBankHeadPos;
+    pDeviceData->rxFragment = frag;
+
+    remain = pDeviceData->rxRemain;
+    DBG_INFO("continous data left in IZAN[pid=%u, frag=%u, length=%u].\n", pid, frag, remain);
+    *pLength = remain;
 
     return CNL_SUCCESS;
 }

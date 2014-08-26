@@ -304,10 +304,12 @@ CMN_startTask(u8   tskID,
     if(pInParam)
         pCmnTsk->pArg = pInParam;
 
-    pCmnTsk->pTsk = kthread_run(pCmnTsk->pTskFunc, pCmnTsk->pArg, "%s", task_names[tskID-1]);
+    pCmnTsk->pTsk = kthread_create(pCmnTsk->pTskFunc, pCmnTsk->pArg, "%s", task_names[tskID-1]);
     if(IS_ERR(pCmnTsk->pTsk)) {
         return ERR_INVSTAT;
     }
+    /* wake up thread */
+    wake_up_process(pCmnTsk->pTsk);
 
     return SUCCESS;
 }

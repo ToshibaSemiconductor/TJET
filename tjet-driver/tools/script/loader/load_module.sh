@@ -7,8 +7,8 @@ case "$1" in
 
 "FIT" | "Fit" | "fit")
 module_list="sdio sdiocore tososcmn tosbuscmn toscnlfit tosiofit toscnl"
-device_name[0]="CnlFitCtrl"
-device_name[1]="CnlFitAdpt"
+device_name0="CnlFitCtrl"
+device_name1="CnlFitAdpt"
 ;;
 
 *)
@@ -62,9 +62,9 @@ if [ -f $para_file ]; then
         para_1=$para_1$regaddr,
         para_2=$para_2$value,
     done
+    para_1=`echo $para_1 | sed -e "s/.\$//"`
+    para_2=`echo $para_2 | sed -e "s/.\$//"`
     exec 3<&-
-    para_1=${para_1%,}
-    para_2=${para_2%,}
 fi
 
 
@@ -75,15 +75,52 @@ echo "### Install driver modules ..."
 
 for module_name in $module_list
 do
-    echo -n "+++ install $module_name ... "
-    if [ "$module_name" == "tososcmn" ]; then
-        /sbin/insmod "$obj_dir/$module_name$module_sfx" "$para_1 $para_2" > $log
+    flag=`cat /proc/modules | grep "$module_name "`
+echo ${flag}
+    if [ ${#flag[*]} = 0 ]; then
+        echo -n "+++ install $module_name ... "
+        if [ "$module_name" = "tososcmn" ]; then
+            /sbin/insmod "$obj_dir/$module_name$module_sfx" "$para_1" "$para_2" > $log
+        else
+            /sbin/insmod "$obj_dir/$module_name$module_sfx" > $log
+        fi
+        if [ $? = 0 ]; then
+            echo "OK."
+        else
+            echo "Failed."
+            exit 1
+        fi
     else
-        /sbin/insmod "$obj_dir/$module_name$module_sfx" > $log
-    fi
-    if [ $? == 0 ]; then
-        echo "OK."
-    else
-        echo "Failed."
+        echo "$module_name module has been already installed..."
     fi
 done
+
+#
+# Link device node.
+#
+echo "### Link device node ..."
+
+    dev_node=`ls -l ${device_dir} | grep $device_name0`
+    dev_info=`cat /proc/devices | grep $device_name0`
+    if [ ${#dev_info[*]} = 0 ]; then
+        echo "$module_name module had not been installed yet or device node unnecessary."
+    else
+        echo -n "+++ making ${device_name0} device node $device_dir/${device_name0}"
+        ln -s $device_dir/${device_name0}0 $device_dir/${device_name0}
+        echo "+++ $device_dir/$device_name0 is linked to $device_dir/${device_name0}0"
+
+        chmod $device_attr $device_dir/$device_name0
+    fi
+
+    dev_node=`ls -l ${device_dir} | grep $device_name1`
+    dev_info=`cat /proc/devices | grep $device_name1`
+    if [ ${#dev_info[*]} = 0 ]; then
+        echo "$module_name module had not been installed yet or device node unnecessary."
+    else
+        echo -n "+++ making ${device_name1} device node $device_dir/${device_name1}"
+        ln -s $device_dir/${device_name1}0 $device_dir/${device_name1}
+        echo "+++ $device_dir/$device_name1 is linked to $device_dir/${device_name1}0"
+
+        chmod $device_attr $device_dir/$device_name1
+    fi
+

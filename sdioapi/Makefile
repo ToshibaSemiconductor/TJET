@@ -1,7 +1,3 @@
-#
-# Makefile for TOSHIBA Modules
-#
-
 export KERNELDIR ?= 
 
 export ARCH=arm

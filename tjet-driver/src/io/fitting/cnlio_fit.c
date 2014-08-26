@@ -79,7 +79,7 @@
 /**
  * @brief module version informations
  */
-#define DRIVER_VERSION "1.0.0";
+#define DRIVER_VERSION "1.0.1";
 
 
 /*-------------------------------------------------------------------
@@ -105,6 +105,8 @@ typedef struct tag_S_CNLIO_ARG_BOX     {
 
     // argument itself
     S_CNLIO_ARG_BUCKET                 arg;
+
+    struct semaphore                   sema;
 
 } S_CNLIO_ARG_BOX;
 
@@ -152,6 +154,26 @@ struct class				*g_adptClass;
 /**
  * @brief control exclusively
  */
+static inline void
+ioctl_lock(struct semaphore *sem)
+{
+    while(1)
+    {
+        if (down_interruptible(sem))
+            continue;
+        break;
+    }
+    return;
+}
+
+static inline void
+ioctl_unlock(struct semaphore *sem)
+{
+    up(sem);
+
+    return;
+}
+
 static inline void
 CNLIO_FIT_LOCK(S_CNLIO_FIT_PRIV *pPriv)
 {
@@ -580,6 +602,7 @@ CNLIO_fitIoctl(struct file  *pFile,
 
     S_CNLIO_FIT_PRIV  *pfitPriv = NULL;
     S_CNLIO_ARG_BOX    *pBox     = NULL;
+    int                 free;
 
 
     // get the private data of the Jet driver
@@ -622,7 +645,9 @@ CNLIO_fitIoctl(struct file  *pFile,
         goto EXIT;
     }
 
-    if(pBox->free) {
+    free = pBox->free;
+    ioctl_unlock(&pBox->sema);
+    if (free == TRUE) {
         kfree(pBox);
     }
 
@@ -692,6 +717,9 @@ CNLIO_fitIoctlPreProc(S_CNLIO_FIT_PRIV *pfitPriv,
     // copy the user argument to the kernel argument in the BOX
     //
     memset(pBox, 0, sizeof(S_CNLIO_ARG_BOX));
+
+    sema_init(&pBox->sema, 1);
+    ioctl_lock(&pBox->sema);
 
     // check IN parameter length.
     length = CNLIO_fitGetInParamLength(cmd);
@@ -792,6 +820,9 @@ CNLIO_fitIoctlPostProc(S_CNLIO_FIT_PRIV *pfitPriv,
         if(pListedBox) {
             void *puBuf;
             void *pnBuf;
+
+            ioctl_lock(&pListedBox->sema);
+
             puBuf = (void *)pListedBox->pusr;
             pnBuf = (void *)pListedBox->arg.req.data.userBufAddr;
 
@@ -809,6 +840,9 @@ CNLIO_fitIoctlPostProc(S_CNLIO_FIT_PRIV *pfitPriv,
             }
             if(pnBuf)
                 kfree(pnBuf);
+
+            ioctl_unlock(&pListedBox->sema);
+
             kfree(pListedBox);
         }
     }
@@ -1212,6 +1246,16 @@ ctrl_class_exit:
 static void __exit
 CNLIO_fitExit(void)
 {
+
+    // destroy node and class
+	device_destroy(g_adptClass, g_adptDevNo);
+	class_destroy(g_adptClass);
+    DBG_INFO("destroy ADPT class and device completed.\n");
+
+	device_destroy(g_ctrlClass, g_ctrlDevNo);
+	class_destroy(g_ctrlClass);
+    DBG_INFO("destroy CTRL class and device completed.\n");
+
     // unregister character device and driver
     cdev_del(&g_adptChar);
     unregister_chrdev_region(g_adptDevNo, CNLIO_ADPT_MAX_CHANNEL);

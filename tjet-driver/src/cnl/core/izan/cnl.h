@@ -371,7 +371,11 @@ typedef struct tagS_CNL_DEVICE_OPS {
     T_CNL_ERR (*pSleep)(S_CNL_DEV *);
     T_CNL_ERR (*pSendMngFrame)(S_CNL_DEV *, u16, void *, void *);
     T_CNL_ERR (*pSendData)(S_CNL_DEV *, u8, u8, u32, void *);
+    T_CNL_ERR (*pSendDataIntUnmask)(S_CNL_DEV *);
+    T_CNL_ERR (*pReadReadyTxBuffer)(S_CNL_DEV *, u32 *);
     T_CNL_ERR (*pReceiveData)(S_CNL_DEV *, u8, u8 *, u32 *, void *);
+    T_CNL_ERR (*pReceiveDataIntUnmask)(S_CNL_DEV *);
+    T_CNL_ERR (*pReadReadyRxBuffer)(S_CNL_DEV *, u32 *, u8);
 
     // call from scheduler or statemachine functions.
     T_CNL_ERR (*pReadReadyPid)(S_CNL_DEV *, u8 *);

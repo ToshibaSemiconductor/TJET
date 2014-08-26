@@ -87,3 +87,22 @@ do
         echo "Failed."
     fi
 done
+
+#
+# make device node
+#
+echo "### Link device node ..."
+
+for dev_file in ${device_name[*]}
+do
+    target=/dev/${dev_file}0
+    symlink_name=/dev/${dev_file}
+    if ! test ${target} -ef ${symlink_name}; then
+        rm ${symlink_name} 2> /dev/null
+        echo "+++ ${symlink_name} is linked to ${target}"
+        ln -s ${target} ${symlink_name}
+        chmod 0666 ${symlink_name}
+    else
+        echo "    ${symlink_name} was linked to ${target}"
+    fi
+done

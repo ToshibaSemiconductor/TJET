@@ -92,9 +92,6 @@
 
 #define BUSCLKEN_SP                     0x01
 
-#define PMIVLCLKEN0_DEFAULT             0x1F
-#define PMIVLCLKEN0_EFUSE               0x08
-
 //
 // ReSet Generator(RSG) registers definition.
 // address range : 0x00800 - 0x00BFF
@@ -117,10 +114,6 @@
 
 // PMFUSESWRST register value.
 #define PMFUSESWRST_PM_FUSE                0x01
-
-// PMIVLSWRST register value.
-#define PMIVLSWRST_DEFAULT                 0x3F
-#define PMIVLSWRST_EFUSE                   0x08
 
 //
 // PLL registers definition.
@@ -174,6 +167,10 @@
 //
 #define REG_RFFLDDONE                   0x01800
 #define REG_CHIPVERSION                 0x01810
+
+#define REG_ZA_0x01914                  0x01914 
+#define REG_ZA_0x01915                  0x01915 
+#define REG_ZA_0x01916                  0x01916 
 
 #define RFFLDDONE                          0x01
 
@@ -500,6 +497,16 @@
 #define REG_TXRATEDOWNNUM               0x143B0
 #define REG_TXRATEUPNUM                 0x143B4
 
+#define REG_ZA_0x14480                  0x14480
+#define REG_ZA_0x14484                  0x14484
+#define REG_ZA_0x14488                  0x14488
+#define REG_ZA_0x1448C                  0x1448C
+#define REG_ZA_0x14490                  0x14490
+#define REG_ZA_0x14494                  0x14494
+#define REG_ZA_0x14498                  0x14498
+#define REG_ZA_0x1449C                  0x1449C
+#define REG_ZA_0x144A0                  0x144A0
+#define REG_ZA_0x144A4                  0x144A4
 
 // mode setting registers.
 #define REG_LCSTATE                     0x146A8

@@ -43,7 +43,7 @@
 /**
  * @brief module version informations
  */
-#define DRIVER_VERSION "1.0.0";
+#define DRIVER_VERSION "1.0.1";
 #define DRIVER_DESC "CNL OS Abstraction Driver";
 
 /*-------------------------------------------------------------------

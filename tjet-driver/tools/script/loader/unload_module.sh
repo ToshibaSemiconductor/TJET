@@ -7,8 +7,8 @@ case "$1" in
 
 "FIT" | "Fit" | "fit")
 module_list="toscnl tosiofit toscnlfit tosbuscmn tososcmn sdiocore sdio"
-device_name[0]="CnlFitCtrl"
-device_name[1]="CnlFitAdpt"
+device_name0="CnlFitCtrl"
+device_name1="CnlFitAdpt"
 ;;
 
 *)
@@ -38,21 +38,23 @@ fi
 #
 echo "### Remove device node ..."
 
-i=0
-
-while [ ${device_name[i]} ]
-do
-    echo -n "--- remove device node $device_dir/${device_name[i]}*..."
-    rm $device_dir/${device_name[i]}? > $log
-    rm $device_dir/${device_name[i]}  > $log
-    if [ $? == 0 ]; then
+    echo -n "--- remove device node $device_dir/${device_name0}*..."
+    rm $device_dir/${device_name0}  > $log
+    if [ $? = 0 ]; then
         echo "OK"
     else
         echo "Failed"
         # pass through
     fi
-i=$i+1
-done
+
+    echo -n "--- remove device node $device_dir/${device_name1}*..."
+    rm $device_dir/${device_name1}  > $log
+    if [ $? = 0 ]; then
+        echo "OK"
+    else
+        echo "Failed"
+        # pass through
+    fi
 
 
 #
@@ -64,7 +66,7 @@ for module_name in $module_list
 do
     echo -n "--- uninstall $module_name ..."
     /sbin/rmmod $module_name > $log
-    if [ $? == 0 ]; then
+    if [ $? = 0 ]; then
         echo "OK."
     else
         echo "Failed."

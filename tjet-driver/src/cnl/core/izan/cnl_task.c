@@ -42,7 +42,7 @@
 /*-------------------------------------------------------------------
  * Macro definition
  *-----------------------------------------------------------------*/
-
+#define RECONFIRM_TX_BUFFER_MAXCOUNT	16
 
 /*-------------------------------------------------------------------
  * Structure definition
@@ -640,6 +640,9 @@ CNL_execSendReq(S_CNL_DEV    *pCnlDev,
     void           *pDataPtr;
     u8              fragment;
 
+    u32             post_length;
+    u8              ite_num   = 0;
+    u8              req_flag  = FALSE;
 
     while(pAction->readyLength > 0) {
         //
@@ -656,6 +659,7 @@ CNL_execSendReq(S_CNL_DEV    *pCnlDev,
             // no more request.
             break;
         }
+        req_flag = TRUE;
 
         pExt = (S_DATA_REQ_EXT *)(&pReq->extData);
         rest = pReq->dataReq.length - pExt->position;
@@ -672,8 +676,8 @@ CNL_execSendReq(S_CNL_DEV    *pCnlDev,
         fragment = (pReq->dataReq.length > pExt->position + length) ? \
             CNL_FRAGMENTED_DATA : pReq->dataReq.fragmented;
 
-        DBG_INFO("execSendReq : call sendData(length=%u(%u CSDU(s)), fragment=%u, pid=%u\n",
-                 length, sendCsdu, fragment, pReq->dataReq.profileId);
+        DBG_INFO("execSendReq : call sendData(reqLength=%u, rest=%u, length=%u(%u CSDU(s)), fragment=%u, readyLength=%u\n",
+                  pReq->dataReq.length,rest,length, sendCsdu, fragment, pAction->readyLength);
 
 
         //
@@ -689,11 +693,40 @@ CNL_execSendReq(S_CNL_DEV    *pCnlDev,
             return retval;
         }
             
+        if ((length != rest) && (ite_num < RECONFIRM_TX_BUFFER_MAXCOUNT) ) {
+            // re-confirm tx buffer
+            retval = pCnlDev->pDeviceOps->pReadReadyTxBuffer(pCnlDev, &post_length);
+            DBG_INFO("execSendReq : post_length = %d\n", post_length);
+            if(retval != CNL_SUCCESS) {
+                DBG_ERR("re-confirm tx buffer failed[%d].\n", retval);
+                return retval;
+            }
+
+            pAction->readyLength    = post_length;
+            ite_num++;
+        } else {
+            pAction->readyLength   -= sendCsdu * CNL_CSDU_SIZE; // not length.
+        }
+
+        DBG_INFO("execSendReq : update readyLength=%u\n",pAction->readyLength);
+        
         // update information.
         pExt->sendingLen       += length;
         pExt->position         += length;
-        pAction->readyLength   -= sendCsdu * CNL_CSDU_SIZE; // not length.
         pCnlDev->txSendingCsdu += sendCsdu;
+    }
+
+    //
+    // call send data device INT unmask operation.
+    //
+    if (req_flag == TRUE) {
+        retval = pCnlDev->pDeviceOps->pSendDataIntUnmask(pCnlDev);
+        DBG_INFO("execSendReq : Int Unmask\n");
+
+        if(retval != CNL_SUCCESS) {
+            DBG_ERR("SendData Int Unmask failed[%d].\n", retval);
+            return retval;
+        }
     }
 
     return CNL_SUCCESS;
@@ -726,6 +759,8 @@ CNL_actionReceiveData(S_CNL_DEV    *pCnlDev,
     u8              profileId;
     u8              fragment;
     S_LIST         *pHead;
+
+    u32             post_length;
 
     profileId = pCnlDev->rxReadyPid;
 
@@ -775,8 +810,25 @@ CNL_actionReceiveData(S_CNL_DEV    *pCnlDev,
         pExt->position       += length;
         pAction->readyLength -= length;
 
-        DBG_INFO("RecvDumpAfter(pos=%u, total=%u, recvd=%u, frag=%d\n",
-                 pExt->position, pReq->dataReq.length, length, fragment);
+        DBG_INFO("RecvDumpAfter(pos=%u, total=%u, recvd=%u, frag=%d, readyLength=%u\n",
+                 pExt->position, pReq->dataReq.length, length, fragment, pAction->readyLength);
+
+        if((pExt->position < pReq->dataReq.length) &&
+            (fragment == CNL_FRAGMENTED_DATA) ) {
+
+            retval = pCnlDev->pDeviceOps->pReadReadyRxBuffer(pCnlDev, &post_length, profileId);
+            if(retval != CNL_SUCCESS) {
+                DBG_ERR("ReadReadyRxBuffer failed[%d].\n", retval);
+                return retval;
+            }
+
+            pAction->readyLength += post_length;
+
+            DBG_INFO("RecvDumpReReadBuffer(pos=%u, total=%u, rxBuffer=%u\n",
+                     pExt->position, pReq->dataReq.length, post_length);
+        }
+        
+        DBG_INFO("RecvData : update readyLength=%u\n",pAction->readyLength);
 
         if((pExt->position >= pReq->dataReq.length) ||
            (fragment       == CNL_NOT_FRAGMENTED_DATA)) {
@@ -805,6 +857,11 @@ CNL_actionReceiveData(S_CNL_DEV    *pCnlDev,
         }
     }
 
+    retval = pCnlDev->pDeviceOps->pReceiveDataIntUnmask(pCnlDev);
+    if(retval != CNL_SUCCESS) {
+        DBG_ERR("ReceiveData IntUnmask failed[%d].\n", retval);
+        return retval;
+    }
 
     if(pAction->readyLength == 0) {
         // all data is read, set rxReady FALSE

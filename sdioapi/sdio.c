@@ -30,7 +30,7 @@
 static struct sdioapi_callback *sdiocallp;
 static struct sdio_func *sdiofunc;
 
-#define DRIVER_VERSION "1.0.0"
+#define DRIVER_VERSION "1.0.1"
 
 
 #define SDIO_VENDOR_ID_TOSHIBA 0x0098
@@ -39,8 +39,6 @@ static struct sdio_func *sdiofunc;
 static const struct sdio_device_id sdioapi_ids[] = {
 	{ SDIO_DEVICE(SDIO_VENDOR_ID_TOSHIBA, SDIO_ANY_ID),
 	  .driver_data = (unsigned long) NULL},
-	{ SDIO_DEVICE(0x02fe, 0x2128),
-	  .driver_data = (unsigned long) NULL}, /* Test device */
 	{ }	/* Terminating entry */
 };
 
