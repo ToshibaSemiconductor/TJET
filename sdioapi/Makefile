@@ -2,6 +2,8 @@ export KERNELDIR ?=
 
 export ARCH=arm
 export CROSS_COMPILE=arm-eabi-
+#export ARCH=arm64
+#export CROSS_COMPILE=aarch64-linux-android-
 
 
 ifneq ($(KERNELRELEASE),)

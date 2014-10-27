@@ -9,7 +9,8 @@ export KERNELDIR ?=
 
 ARCH=arm
 CROSS_COMPILE=arm-eabi-
-
+#ARCH=arm64
+##CROSS_COMPILE=aarch64-linux-android-
 #=====================================================================
 # Configuration Switches
 #=====================================================================

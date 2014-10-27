@@ -134,6 +134,8 @@ typedef enum tagE_CNLWRAP_ADPT_TYPE {
 /*-------------------------------------------------------------------
  * structure definition.
  *-----------------------------------------------------------------*/
+#pragma pack(push, 4)
+
 /**
  * @brief cnl wrapper ioctl status for no-parameter request.
  */
@@ -205,30 +207,24 @@ typedef struct tagS_CNLWRAP_DATA_IND{
  */
 typedef struct tagS_CNLWRAP_DATA_REQ_COMP{
     S_CNLWRAP_STATUS                   status;
-    u32                                requestId;
+    unsigned long                      requestId; //unsigned long is 32bit/64bit compatible id(pointer size).
     u8                                 profileId;
     u8                                 direction;
     u8                                 fragmented;
     u32                                length;    
 }S_CNLWRAP_DATA_REQ_COMP;
 
-
-#define PIPE_MSG_BUFSIZE               32
-#define PIPE_MSG_HDRSIZE               (sizeof(u8) * 2 + sizeof(u16) + sizeof(u32) * 2 + sizeof(void*) * 3)
 /**
- * @brief adapter pipe message.
- */
-typedef struct tagS_CNLWRAP_PIPE_MSG {
-    void                              *pReserved1;
-    void                              *pReserved2;
-    u8                                 srcModID;
-    u8                                 reserved;
-    u16                                type;
-    u32                                length;
-    u32                                userData;
-    void                              *pReserved3;
-    u8                                 buffer[PIPE_MSG_BUFSIZE];
-}S_CNLWRAP_PIPE_MSG;
+   * @brief cnl wrapper event data request completed.  (32bit compatible)
+   */
+typedef struct {
+        S_CNLWRAP_STATUS                   status;
+        u32                                requestId;
+        u8                                 profileId;
+        u8                                 direction;
+        u8                                 fragmented;
+        u32                                length;
+} S_CNLWRAP32_DATA_REQ_COMP;
 
 /**
  * @brief cnl wrapper event..
@@ -246,10 +242,28 @@ typedef struct tagS_CNLWRAP_EVENT {
         S_CNLWRAP_POWERSAVE_IND        powersaveInd;
         S_CNLWRAP_DATA_IND             dataInd;
         S_CNLWRAP_DATA_REQ_COMP        dataReqComp;
-        S_CNLWRAP_PIPE_MSG             pipeMsg;
     };
 }S_CNLWRAP_EVENT;
 
+
+ /**
+  * @brief cnl wrapper event..  (32bit compatible)
+  *  */
+typedef struct {
+        u8                                 type;
+        u16                                length;
+        u8                                 reserved;
+        union {
+                S_CNLWRAP_ERROR_IND            errorInd;
+                S_CNLWRAP_CONNECT_IND          connectInd;
+                S_CNLWRAP_ACCEPT_IND           acceptInd;
+                S_CNLWRAP_ACCEPT_CNF           acceptCnf;
+                S_CNLWRAP_RELEASE_IND          releaseInd;
+                S_CNLWRAP_POWERSAVE_IND        powersaveInd;
+                S_CNLWRAP_DATA_IND             dataInd;
+                S_CNLWRAP32_DATA_REQ_COMP      dataReqComp;
+        };
+} S_CNLWRAP32_EVENT;
 
 /**
  * @brief cnl wrapper ioctl init request.
@@ -307,12 +321,24 @@ typedef struct tagS_CNLWRAP_REQ_DATA{
     u8                                 profileId;
     u8                                 fragmented;
     u32                                length;
-    u32                                userBufAddr;
+    void *                             userBufAddr;
     u8                                 sync;
-    u32                                requestId;
+    unsigned long                      requestId;//unsigned long is 32bit/64bit compatible id(pointer size).
     S_CNLWRAP_STATUS                   status;
 }S_CNLWRAP_REQ_DATA;
 
+/**
+ * @brief cnl wrapper ioctl data request. (32bit compatible)
+ */
+typedef struct {
+        u8                                 profileId;
+        u8                                 fragmented;
+        u32                                length;
+        u32                                userBufAddr;
+        u8                                 sync;
+        u32                                requestId;
+        S_CNLWRAP_STATUS                   status;
+} S_CNLWRAP32_REQ_DATA;
 
 /**
  * @brief cnl wrapper ioctl register cbk
@@ -327,9 +353,17 @@ typedef struct tagS_CNLWRAP_REQ_REGCBK{
  * @brief cnl wrapper ioctl cancel
  */
 typedef struct tagS_CNLWRAP_REQ_CANCEL{
-    u32                                requestId;
+    unsigned long                      requestId;//unsigned long is 32bit/64bit compatible id(pointer size).
     S_CNLWRAP_STATUS                   status;
 }S_CNLWRAP_REQ_CANCEL;
+
+ /**
+  * + * @brief cnl wrapper ioctl cancel  (32bit compatible)
+  * + */
+typedef struct {
+        u32                                requestId;
+        S_CNLWRAP_STATUS                   status;
+} S_CNLWRAP32_REQ_CANCEL;
 
 
 /**
@@ -359,6 +393,7 @@ typedef struct tagS_CNLWRAP_STATS{
     S_CNLWRAP_STATUS                   status;
 }S_CNLWRAP_STATS;
 
+#pragma pack(pop)
 
 /* CNLWRAP I/O control number definitions */
 /* ioctl-magic number 'W','w' are already used all range. */
@@ -371,10 +406,10 @@ typedef struct tagS_CNLWRAP_STATS{
 #define CNLWRAPIOC_ACCEPT              _IOWR(CNLWRAPIOC_MAGIC, 0x84, S_CNLWRAP_REQ_ACCEPT)
 #define CNLWRAPIOC_CONFIRM             _IOR(CNLWRAPIOC_MAGIC,  0x85, S_CNLWRAP_STATUS)
 #define CNLWRAPIOC_RELEASE             _IOWR(CNLWRAPIOC_MAGIC, 0x86, S_CNLWRAP_REQ_RELEASE)
-#define CNLWRAPIOC_SENDDATA            _IOWR(CNLWRAPIOC_MAGIC, 0x87, S_CNLWRAP_REQ_DATA)
-#define CNLWRAPIOC_RECVDATA            _IOWR(CNLWRAPIOC_MAGIC, 0x88, S_CNLWRAP_REQ_DATA)
-#define CNLWRAPIOC_CANCEL              _IOWR(CNLWRAPIOC_MAGIC, 0x89, S_CNLWRAP_REQ_CANCEL)
-#define CNLWRAPIOC_GETEVENT            _IOR(CNLWRAPIOC_MAGIC,  0x8a, S_CNLWRAP_EVENT)
+#define CNLWRAPIOC_SENDDATA            _IOWR(CNLWRAPIOC_MAGIC, 0x87, S_CNLWRAP32_REQ_DATA)
+#define CNLWRAPIOC_RECVDATA            _IOWR(CNLWRAPIOC_MAGIC, 0x88, S_CNLWRAP32_REQ_DATA)
+#define CNLWRAPIOC_CANCEL              _IOWR(CNLWRAPIOC_MAGIC, 0x89, S_CNLWRAP32_REQ_CANCEL)
+#define CNLWRAPIOC_GETEVENT            _IOR(CNLWRAPIOC_MAGIC,  0x8a, S_CNLWRAP32_EVENT)
 #define CNLWRAPIOC_SYNCRECV            _IOW(CNLWRAPIOC_MAGIC,  0x8b, u32)
 #define CNLWRAPIOC_STOP_EVENT          _IO(CNLWRAPIOC_MAGIC,   0x8c)
 

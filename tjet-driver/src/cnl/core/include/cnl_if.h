@@ -47,8 +47,8 @@
 /**
  * @brief CNL cancel request discardRequestID values 
  */
-#define CNL_DISCARD_RECVDATA_0  0x00000000  /* Discard ProfileID:0 receive data */
-#define CNL_DISCARD_RECVDATA_1  0xFFFFFFFF  /* Discard ProfileID:1 receive data */
+#define CNL_DISCARD_RECVDATA_0  (0UL)       /* Discard ProfileID:0 receive data */
+#define CNL_DISCARD_RECVDATA_1  (~0UL)      /* Discard ProfileID:1 receive data */
 
 /**
  * @brief CNL request types

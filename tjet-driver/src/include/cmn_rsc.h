@@ -59,8 +59,8 @@ enum tagE_CMN_MPL_RSC_ID {
  */
 enum tagE_CMN_MPL_SIZE {
     // toscnl
-    CNL_DEV_MPL_SIZE                 = 512,
-    CNL_DUMMY_REQ_MPL_SIZE           = 128,
+    CNL_DEV_MPL_SIZE                 = 640, // It is actual 512B, when a 64-bit data model is LP64.
+    CNL_DUMMY_REQ_MPL_SIZE           = 144, // It is actual 136B, when a 64-bit data model is LP64.
 
     // toscnlev
     CNLEV_DEV_MPL_SIZE               = 128, // actual 100

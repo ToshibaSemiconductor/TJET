@@ -35,6 +35,7 @@
 #include <linux/cdev.h>
 #include <linux/device.h>
 #include <linux/fs.h>
+#include <linux/compat.h>
 
 #include <linux/poll.h>
 #include <linux/wait.h>
@@ -52,7 +53,7 @@
 #include "cmn_type.h"
 #include "cmn_dbg.h"
 #include "cmn_err.h"
-
+#include "cnlfit.h"
 #include "cnlfit_upif.h"
 #include "cnlwrap_if.h"
 
@@ -366,6 +367,9 @@ static int              CNLIO_fitRelease(struct inode *, struct file *);
 static int              CNLIO_fitIoctl(struct inode *, struct file *, uint, ulong);
 #else
 static long             CNLIO_fitIoctl(struct file *, uint, ulong);
+#if defined(_LP64) == 1
+static long             CNLIO_compat_fitIoctl(struct file *, uint, ulong);
+#endif
 #endif
 static uint             CNLIO_fitPoll(struct file *, struct poll_table_struct *);
 
@@ -1009,6 +1013,152 @@ CNLIO_fitCmdFinisher(S_CNLIO_FIT_PRIV *pfitPriv,
     return retval;
 }
 
+#if (KERNEL_VERSION(2,6,36) <= LINUX_VERSION_CODE) && (defined(_LP64) == 1)
+/*-------------------------------------------------------------------
+ * Function   : CNLIO_compat_fitIoctl
+ *-----------------------------------------------------------------*/
+static long
+CNLIO_compat_fitIoctl(struct file * pFile,
+                      uint          cmd,
+                      ulong         arg)
+{
+    long retval = -EINVAL;
+    void __user * arg32 = compat_ptr(arg);
+
+    DBG_INFO("CNLIO_compat_fitIoctl(cmd=%s)+\n", CNLFIT_cmdToString(cmd));
+    DBG_INFO("#####CNLIO_compat_fitIoctl(cmd=%x)+\n", cmd);
+
+    switch (cmd) {
+    case CNLWRAPIOC_SENDDATA:
+    case CNLWRAPIOC_RECVDATA: {
+        S_CNLWRAP32_REQ_DATA req32;
+        S_CNLWRAP_REQ_DATA req64;
+        S_CNLWRAP_REQ_DATA __user * arg64;
+
+        arg64 = compat_alloc_user_space(sizeof *arg64);
+
+        if (copy_from_user(&req32, arg32, sizeof req32)) {
+            retval = -EFAULT;
+            break;
+        }
+
+        req64.profileId = req32.profileId;
+        req64.fragmented = req32.fragmented;
+        req64.length = req32.length;
+        req64.userBufAddr = compat_ptr(req32.userBufAddr);
+        req64.sync = req32.sync;
+        req64.requestId = (ulong)compat_ptr(req32.requestId);
+
+        if (copy_to_user(arg64, &req64, sizeof req64)) {
+            retval = -EFAULT;
+            break;
+        }
+
+        retval = CNLIO_fitIoctl(pFile, cmd, (ulong)arg64);
+
+        if (copy_from_user(&req64, arg64, sizeof req64)) {
+            retval = -EFAULT;
+            break;
+        }
+
+        req32.status = req64.status;
+
+        if (copy_to_user(arg32, &req32, sizeof req32)) {
+            retval = -EFAULT;
+            break;
+        }
+
+        }
+        break;
+
+    case CNLWRAPIOC_GETEVENT: {
+        void * src32;
+        S_CNLWRAP32_EVENT req32;
+        S_CNLWRAP_EVENT req64;
+        S_CNLWRAP_EVENT __user * arg64;
+
+        arg64 = compat_alloc_user_space(sizeof *arg64);
+
+        retval = CNLIO_fitIoctl(pFile, cmd, (ulong)arg64);
+
+        if (copy_from_user(&req64, arg64, sizeof req64)) {
+            retval = -EFAULT;
+            break;
+        }
+
+        if (CNLWRAP_EVENT_DATA_REQ_COMP == req64.type) {
+            req32.type = req64.type;
+            req32.length = req64.length;
+            req32.dataReqComp.status = req64.dataReqComp.status;
+            req32.dataReqComp.requestId = (u32)req64.dataReqComp.requestId;
+            req32.dataReqComp.profileId = req64.dataReqComp.profileId;
+            req32.dataReqComp.direction = req64.dataReqComp.direction;
+            req32.dataReqComp.fragmented = req64.dataReqComp.fragmented;
+            req32.dataReqComp.length = req64.dataReqComp.length;
+
+            src32 = &req32;
+        } else
+            src32 = &req64;
+
+        if (copy_to_user(arg32, src32, sizeof req32)) {
+            retval = -EFAULT;
+            break;
+        }
+
+        }
+        break;
+
+    case CNLWRAPIOC_CANCEL: {
+        S_CNLWRAP32_REQ_CANCEL req32;
+        S_CNLWRAP_REQ_CANCEL req64;
+        S_CNLWRAP_REQ_CANCEL __user * arg64;
+
+        arg64 = compat_alloc_user_space(sizeof *arg64);
+
+        if (copy_from_user(&req32, arg32, sizeof req32)) {
+            retval = -EFAULT;
+            break;
+        }
+
+        req64.requestId = (req32.requestId == (u32)CNL_DISCARD_RECVDATA_1)
+                        ? CNL_DISCARD_RECVDATA_1
+                        : (ulong)compat_ptr(req32.requestId);
+
+        if (copy_to_user(arg64, &req64, sizeof req64)) {
+            retval = -EFAULT;
+            break;
+        }
+
+        retval = CNLIO_fitIoctl(pFile, cmd, (ulong)arg64);
+
+        if (copy_from_user(&req64, arg64, sizeof req64)) {
+            retval = -EFAULT;
+            break;
+        }
+
+        req32.status = req64.status;
+
+        if (copy_to_user(arg32, &req32, sizeof req32)) {
+            retval = -EFAULT;
+            break;
+        }
+
+        }
+        break;
+
+    default:
+        retval = CNLIO_fitIoctl(pFile, cmd, (ulong)arg32);
+        break;
+    }
+
+    DBG_INFO("CNLIO_compat_fitIoctl(cmd=%s)- %s\n", CNLFIT_cmdToString(cmd)
+        , retval ? "failed" : "success");
+
+    return retval;
+}
+#endif
+
+
 
 /*-------------------------------------------------------------------
  * Function   : CNLIO_fitSearchAsyncBox
@@ -1124,6 +1274,9 @@ static const struct file_operations  g_ctrlOps = {
     .ioctl                             = CNLIO_fitIoctl,
 #else
     .unlocked_ioctl                    = CNLIO_fitIoctl,
+#if defined(_LP64) == 1
+    .compat_ioctl                      = CNLIO_compat_fitIoctl,
+#endif
 #endif
     .open                              = CNLIO_fitOpen,
     .release                           = CNLIO_fitRelease,

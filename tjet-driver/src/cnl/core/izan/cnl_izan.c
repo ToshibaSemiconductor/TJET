@@ -1767,13 +1767,15 @@ IZAN_setModeSelect(S_CNL_DEV *pCnlDev)
         return retval;
     }
 
+/*
     tmpval = IZAN_DEFAULT_RATE_REG_VALUE;  // Manual(fixed rate)
     if(CMN_getModeSelect() == MD_LINKADPT){
         tmpval = (tmpval & 0x3FFFFFFF) | RATE_LC_AUTO; // link adaptation
     } else {
         tmpval = (tmpval & 0x3FFFFFFF) | RATE_MANUAL; // Manual rate
     }
-    tmpval = CMN_H2LE32(tmpval);
+*/
+    tmpval = (tmpval & 0x3FFFFFFF) | RATE_MANUAL; // Manual rate
     retval = IZAN_writeRegister(pDev, REG_RATE, 4, &tmpval);
     if(retval != CNL_SUCCESS) {
         DBG_ERR("IZAN_setModeSelect : set REG_RATE(0x%x) failed[%d].\n", tmpval, retval);

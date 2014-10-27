@@ -55,8 +55,8 @@ enum tagE_CMN_MPL_RSC_ID_EXT {
  */
 enum tagE_CMN_MPL_SIZE_EXT {
     // toscnlfit
-    CNLFIT_DEV_MPL_SIZE             = 256, // actual 128
-    CNLFIT_IOCONT_MPL_SIZE          = 128, // actual 112
+    CNLFIT_DEV_MPL_SIZE             = 256, // It is actual 248B, when a 64-bit data model is LP64.
+    CNLFIT_IOCONT_MPL_SIZE          = 160, // It is actual 160B, when a 64-bit data model is LP64.
 
     // sipipe
     SIPIPE_MPL_INFO_SIZE             = 64, // temporary(acturl 38)
