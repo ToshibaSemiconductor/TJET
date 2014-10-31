@@ -1,0 +1,53 @@
+
+----------------------------------------
+Compile Transfer-Jet driver
+-----------------------------------------
+Prerequisites:
+1. Android bootimage is built once
+2. Run the driver build on same terminal where android build environment is set-up
+
+Building TransferJet Kernel Modules:
+1. Go to TjetDriver folder
+        $ cd TJET
+3. Export kernel object folder
+        $ export KERNELDIR=<path to android root>/out/target/product/<product_name>/obj/KERNEL_OBJ
+		
+4. If your CPU is arm64 bit then apply 0001-This-patch-is-configure-Makefile-for-ARM64-bit-archi.patch
+    patch.
+	$git apply  0001-This-patch-is-configure-Makefile-for-ARM64-bit-archi.patch
+	
+5. Run make command
+        $ make clean
+        $ make all
+6. After make finishes, driver modules will be placed in "objs" folder
+
+
+----------------------------------------
+Installing Transfer-Jet Driver on Hardware
+-----------------------------------------
+1. Check if device is listed as adb device
+        $ adb devices
+2. Give read/write permission to filesystem.
+	$cd obj
+	$adb root
+	$adb shell mount -o remount,rw /
+	$adb remount
+	$adb push rfcnf.ini /system/lib/modules/rfcnf.ini
+	$adb push sdiocore.ko /system/lib/modules
+	$adb push tosbuscmn.ko /system/lib/modules
+	$adb push toscnl.ko /system/lib/modules
+	$adb push sdio.ko /system/lib/modules
+	$adb push toscnlfit.ko /system/lib/modules
+	$adb push tosiofit.ko /system/lib/modules
+	$adb push tososcmn.ko /system/lib/modules
+	$adb push android_load_module.sh /system/lib/modules
+	$adb push android_unload_module.sh /system/lib/modules
+	$adb reboot
+
+----------------------------------------------
+Installing Transferjet application on Hardware
+----------------------------------------------
+Note: Please uninstall older Transfer-Jet application from the device
+1. $adb install TransferJetUtility.apk
+2. Boot with new boot image.
+3. Run Transfer-Jet application.

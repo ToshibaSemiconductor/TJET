@@ -1,0 +1,51 @@
+From 929ff834d634cf299cdd43299298437715b83f95 Mon Sep 17 00:00:00 2001
+From: Prakash Iyer <prakash.iyer@taec.toshiba.com>
+Date: Fri, 31 Oct 2014 13:50:46 -0700
+Subject: [PATCH] This patch is to configure Makefile for ARM64 bit architecture.
+
+Signed-off-by: Prakash Iyer <prakash.iyer@taec.toshiba.com>
+---
+ sdioapi/Makefile        | 8 ++++----
+ tjet-driver/Config.make | 8 ++++----
+ 2 files changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/sdioapi/Makefile b/sdioapi/Makefile
+index 39f07b9..12733e3 100644
+--- a/sdioapi/Makefile
++++ b/sdioapi/Makefile
+@@ -1,9 +1,9 @@
+ export KERNELDIR ?= 
+ 
+-export ARCH=arm
+-export CROSS_COMPILE=arm-eabi-
+-#export ARCH=arm64
+-#export CROSS_COMPILE=aarch64-linux-android-
++#export ARCH=arm
++#export CROSS_COMPILE=arm-eabi-
++export ARCH=arm64
++export CROSS_COMPILE=aarch64-linux-android-
+ 
+ 
+ ifneq ($(KERNELRELEASE),)
+diff --git a/tjet-driver/Config.make b/tjet-driver/Config.make
+index 1bbe855..cf68bd0 100644
+--- a/tjet-driver/Config.make
++++ b/tjet-driver/Config.make
+@@ -7,10 +7,10 @@
+ export
+ export KERNELDIR ?= 
+ 
+-ARCH=arm
+-CROSS_COMPILE=arm-eabi-
+-#ARCH=arm64
+-##CROSS_COMPILE=aarch64-linux-android-
++#ARCH=arm
++#CROSS_COMPILE=arm-eabi-
++ARCH=arm64
++CROSS_COMPILE=aarch64-linux-android-
+ #=====================================================================
+ # Configuration Switches
+ #=====================================================================
+-- 
+1.8.5.2
+
