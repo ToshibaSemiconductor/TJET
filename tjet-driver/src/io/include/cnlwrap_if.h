@@ -202,6 +202,7 @@ typedef struct tagS_CNLWRAP_DATA_IND{
     u8                                 profileId;
 }S_CNLWRAP_DATA_IND;
 
+
 /**
  * @brief cnl wrapper event data request completed.
  */
@@ -214,17 +215,49 @@ typedef struct tagS_CNLWRAP_DATA_REQ_COMP{
     u32                                length;    
 }S_CNLWRAP_DATA_REQ_COMP;
 
+
 /**
-   * @brief cnl wrapper event data request completed.  (32bit compatible)
-   */
+ * @brief cnl wrapper event data request completed.  (32bit compatible)
+ */
 typedef struct {
-        S_CNLWRAP_STATUS                   status;
-        u32                                requestId;
-        u8                                 profileId;
-        u8                                 direction;
-        u8                                 fragmented;
-        u32                                length;
+    S_CNLWRAP_STATUS                   status;
+    u32                                requestId;
+    u8                                 profileId;
+    u8                                 direction;
+    u8                                 fragmented;
+    u32                                length;    
 } S_CNLWRAP32_DATA_REQ_COMP;
+
+
+#define PIPE_MSG_BUFSIZE               32
+#define PIPE_MSG_HDRSIZE               (sizeof(u8) * 2 + sizeof(u16) + sizeof(u32) * 2 + sizeof(void*) * 3)
+
+/**
+ * @brief adapter pipe message.
+ */
+typedef struct tagS_CNLWRAP_PIPE_MSG {
+    void                              *pReserved1;
+    void                              *pReserved2;
+    u8                                 srcModID;
+    u8                                 reserved;
+    u16                                type;
+    u32                                length;
+    u32                                userData;
+    void                              *pReserved3;
+    u8                                 buffer[PIPE_MSG_BUFSIZE];
+}S_CNLWRAP_PIPE_MSG;
+
+typedef struct {
+    u32                                pReserved1;
+    u32                                pReserved2;
+    u8                                 srcModID;
+    u8                                 reserved;
+    u16                                type;
+    u32                                length;
+    u32                                userData;
+    u32                                pReserved3;
+    u8                                 buffer[PIPE_MSG_BUFSIZE];
+} S_CNLWRAP32_PIPE_MSG;
 
 /**
  * @brief cnl wrapper event..
@@ -242,28 +275,31 @@ typedef struct tagS_CNLWRAP_EVENT {
         S_CNLWRAP_POWERSAVE_IND        powersaveInd;
         S_CNLWRAP_DATA_IND             dataInd;
         S_CNLWRAP_DATA_REQ_COMP        dataReqComp;
+        S_CNLWRAP_PIPE_MSG             pipeMsg;
     };
 }S_CNLWRAP_EVENT;
 
 
- /**
-  * @brief cnl wrapper event..  (32bit compatible)
-  *  */
+/**
+ * @brief cnl wrapper event..  (32bit compatible)
+ */
 typedef struct {
-        u8                                 type;
-        u16                                length;
-        u8                                 reserved;
-        union {
-                S_CNLWRAP_ERROR_IND            errorInd;
-                S_CNLWRAP_CONNECT_IND          connectInd;
-                S_CNLWRAP_ACCEPT_IND           acceptInd;
-                S_CNLWRAP_ACCEPT_CNF           acceptCnf;
-                S_CNLWRAP_RELEASE_IND          releaseInd;
-                S_CNLWRAP_POWERSAVE_IND        powersaveInd;
-                S_CNLWRAP_DATA_IND             dataInd;
-                S_CNLWRAP32_DATA_REQ_COMP      dataReqComp;
-        };
+    u8                                 type;
+    u16                                length;
+    u8                                 reserved;
+    union {
+        S_CNLWRAP_ERROR_IND            errorInd;
+        S_CNLWRAP_CONNECT_IND          connectInd;
+        S_CNLWRAP_ACCEPT_IND           acceptInd;
+        S_CNLWRAP_ACCEPT_CNF           acceptCnf;
+        S_CNLWRAP_RELEASE_IND          releaseInd;
+        S_CNLWRAP_POWERSAVE_IND        powersaveInd;
+        S_CNLWRAP_DATA_IND             dataInd;
+        S_CNLWRAP32_DATA_REQ_COMP      dataReqComp;
+        S_CNLWRAP32_PIPE_MSG           pipeMsg;
+    };
 } S_CNLWRAP32_EVENT;
+
 
 /**
  * @brief cnl wrapper ioctl init request.
@@ -327,18 +363,20 @@ typedef struct tagS_CNLWRAP_REQ_DATA{
     S_CNLWRAP_STATUS                   status;
 }S_CNLWRAP_REQ_DATA;
 
+
 /**
  * @brief cnl wrapper ioctl data request. (32bit compatible)
  */
 typedef struct {
-        u8                                 profileId;
-        u8                                 fragmented;
-        u32                                length;
-        u32                                userBufAddr;
-        u8                                 sync;
-        u32                                requestId;
-        S_CNLWRAP_STATUS                   status;
+    u8                                 profileId;
+    u8                                 fragmented;
+    u32                                length;
+    u32                                userBufAddr;
+    u8                                 sync;
+    u32                                requestId;
+    S_CNLWRAP_STATUS                   status;
 } S_CNLWRAP32_REQ_DATA;
+
 
 /**
  * @brief cnl wrapper ioctl register cbk
@@ -357,12 +395,13 @@ typedef struct tagS_CNLWRAP_REQ_CANCEL{
     S_CNLWRAP_STATUS                   status;
 }S_CNLWRAP_REQ_CANCEL;
 
- /**
-  * + * @brief cnl wrapper ioctl cancel  (32bit compatible)
-  * + */
+
+/**
+ * @brief cnl wrapper ioctl cancel  (32bit compatible)
+ */
 typedef struct {
-        u32                                requestId;
-        S_CNLWRAP_STATUS                   status;
+    u32                                requestId;
+    S_CNLWRAP_STATUS                   status;
 } S_CNLWRAP32_REQ_CANCEL;
 
 
