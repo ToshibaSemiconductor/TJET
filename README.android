@@ -3,31 +3,43 @@
 Compile Transfer-Jet driver
 -----------------------------------------
 Prerequisites:
-1. Android bootimage is built once
-2. Run the driver build on same terminal where android build environment is set-up
+1. Android bootimage is built once.
+2. Run the driver build on the same terminal where the android build environment is set-up.
 
+---------------------
+Building Boot image
+---------------------
+1. Get the system-core patch from Toshiba for your platform. This patch will
+   change the platform files to configure and load the Transfer-Jet modules at boot time.
+2. Build the bootimage.
+
+------------------------------------
 Building TransferJet Kernel Modules:
+------------------------------------
 1. Go to TjetDriver folder
         $ cd TJET
 3. Export kernel object folder
         $ export KERNELDIR=<path to android root>/out/target/product/<product_name>/obj/KERNEL_OBJ
 		
-4. If your CPU is arm64 bit then apply 0001-This-patch-is-configure-Makefile-for-ARM64-bit-archi.patch
+4. If your CPU is an arm 64 bit CPU, then apply 0001-This-patch-is-configure-Makefile-for-ARM64-bit-archi.patch
     patch.
 	$git apply  0001-This-patch-is-configure-Makefile-for-ARM64-bit-archi.patch
 	
-5. Run make command
+5. Run the make command
         $ make clean
         $ make all
-6. After make finishes, driver modules will be placed in "objs" folder
+6. After make finishes, driver modules will be placed in the "objs" folder
 
 
 ----------------------------------------
 Installing Transfer-Jet Driver on Hardware
 -----------------------------------------
-1. Check if device is listed as adb device
+1. Copy android_load_module.sh and android_unload_module.sh to objs
+   directory from tjet-driver/tools/script/loader/.
+
+2. Check if the device is listed as an adb device
         $ adb devices
-2. Give read/write permission to filesystem.
+3. Give read/write permission to filesystem.
 	$cd obj
 	$adb root
 	$adb shell mount -o remount,rw /
@@ -49,5 +61,5 @@ Installing Transferjet application on Hardware
 ----------------------------------------------
 Note: Please uninstall older Transfer-Jet application from the device
 1. $adb install TransferJetUtility.apk
-2. Boot with new boot image.
-3. Run Transfer-Jet application.
+2. Boot with the new boot image.
+3. Run the Transfer-Jet application.
