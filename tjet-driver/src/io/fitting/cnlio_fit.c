@@ -56,6 +56,8 @@
 #include "cnlfit.h"
 #include "cnlfit_upif.h"
 #include "cnlwrap_if.h"
+#include "cmn_rsc.h"
+#include "cmn_rsc2.h"
 
 
 /*-------------------------------------------------------------------
@@ -520,9 +522,10 @@ CNLIO_fitRelease(struct inode *pInode,
     pFile->private_data = NULL;
 
     // free the private data of the CNL IO
-    kfree(pfitPriv);
+    //kfree(pfitPriv);
 
 EXIT:
+    kfree(pfitPriv);
     return retval;
 }
 
@@ -842,8 +845,11 @@ CNLIO_fitIoctlPostProc(S_CNLIO_FIT_PRIV *pfitPriv,
                     retval = -EFAULT;
                 }
             }
-            if(pnBuf)
-                kfree(pnBuf);
+            if(pnBuf){
+                CMN_releaseFixedMemPool(CNLFIT_TXRX_MPL_ID, pnBuf);
+                DBG_INFO("CMN_releaseFixedMemPool(CNLFIT_TXRX_MPL_ID, ptr= %p)\n",pnBuf);
+            }
+
 
             ioctl_unlock(&pListedBox->sema);
 
@@ -915,13 +921,9 @@ CNLIO_fitCmdInitializer(S_CNLIO_FIT_PRIV *pfitPriv,
 
 
     if(puBuf) {
-        pnBuf = kmalloc(ubufLen, GFP_KERNEL);
-
-        if(pnBuf == NULL) {
-            retval = -ENOMEM;
-            goto EXIT;
-        }
-
+        retval = CMN_getFixedMemPool(CNLFIT_TXRX_MPL_ID,
+                                            &pnBuf, CMN_TIME_FEVR);
+        DBG_INFO("CMN_getFixedMemPool(CNLFIT_TXRX_MPL_ID, ptr= %p)\n",pnBuf);
 
         if(copyLen) {
             if(copy_from_user(pnBuf, puBuf, copyLen)) {
@@ -941,7 +943,10 @@ CNLIO_fitCmdInitializer(S_CNLIO_FIT_PRIV *pfitPriv,
 
 EXIT:
     if(retval != 0) {
-        if(pnBuf)  kfree(pnBuf);
+	if(pnBuf){
+		CMN_releaseFixedMemPool(CNLFIT_TXRX_MPL_ID, pnBuf);
+		DBG_INFO("CMN_releaseFixedMemPool(CNLFIT_TXRX_MPL_ID, ptr= %p)\n",pnBuf);
+	}
     }
 
     return retval;
@@ -996,7 +1001,9 @@ CNLIO_fitCmdFinisher(S_CNLIO_FIT_PRIV *pfitPriv,
 
             pnBuf = (void *)pBox->arg.req.data.userBufAddr;
 
-            kfree(pnBuf);
+            CMN_releaseFixedMemPool(CNLFIT_TXRX_MPL_ID, pnBuf);
+            DBG_INFO("CMN_releaseFixedMemPool(CNLFIT_TXRX_MPL_ID, ptr= %p)\n",pnBuf);
+
             pBox->free = TRUE;
         } else {
             // success to request.
@@ -1245,8 +1252,10 @@ CNLIO_fitArgBucketPurge(S_CNLIO_FIT_PRIV *pfitPriv)
         pData = (void *)(pdataReq->userBufAddr);
         if(pData != NULL) {
             // deallocate data buffer
-            DBG_INFO("(rel)kfree pData[%p]\n",pData);
-            kfree(pData);
+            DBG_INFO("(rel)releaseFixedMemPool pData[%p]\n",pData);
+            CMN_releaseFixedMemPool(CNLFIT_TXRX_MPL_ID, pData);
+            DBG_INFO("CMN_releaseFixedMemPool(CNLFIT_TXRX_MPL_ID, ptr= %p)\n",pData);
+
         }
         // deallocate arg box
         list_del(&pBox->elm);
@@ -1366,6 +1375,18 @@ CNLIO_fitInit(void)
     DBG_INFO("add ADPT character device completed[major = %d].\n",
              MAJOR(g_adptDevNo));
 
+    // create send/receive buffer
+    retval = CMN_createFixedMemPool(CNLFIT_TXRX_MPL_ID,
+                                    0,
+                                    CNLFIT_TXRX_MPL_CNT,
+                                    CNLFIT_TXRX_MPL_SIZE);
+    DBG_INFO("CMN_createFixedMemPool(CNLFIT_TXRX_MPL_ID)\n");
+
+    if(retval != SUCCESS) {
+        DBG_ERR("create CNL Fixed memory pool object failed\n");
+        goto adpt_exit;
+    }
+
     return 0;
 
 adpt_exit:
@@ -1399,6 +1420,9 @@ ctrl_class_exit:
 static void __exit
 CNLIO_fitExit(void)
 {
+
+    CMN_deleteFixedMemPool(CNLFIT_TXRX_MPL_ID);
+    DBG_INFO("CMN_deleteFixedMemPool(CNLFIT_TXRX_MPL_ID)\n");
 
     // destroy node and class
 	device_destroy(g_adptClass, g_adptDevNo);

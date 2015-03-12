@@ -36,7 +36,7 @@
 /**
  * @brief for memory pool configuration
  */
-#define CMN_MEM_POOL_MAX_NUM 10
+#define CMN_MEM_POOL_MAX_NUM 11
 
 //#define USE_IN_INTR_CONTEXT // default no.
 

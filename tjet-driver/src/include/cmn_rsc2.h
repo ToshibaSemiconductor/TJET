@@ -57,6 +57,7 @@ enum tagE_CMN_MPL_SIZE_EXT {
     // toscnlfit
     CNLFIT_DEV_MPL_SIZE             = 256, // It is actual 248B, when a 64-bit data model is LP64.
     CNLFIT_IOCONT_MPL_SIZE          = 160, // It is actual 160B, when a 64-bit data model is LP64.
+    CNLFIT_TXRX_MPL_SIZE            = 65536, // SEND/RECEIVE Buffer size
 
     // sipipe
     SIPIPE_MPL_INFO_SIZE             = 64, // temporary(acturl 38)
@@ -75,6 +76,7 @@ enum tagE_CMN_MPL_CNT_EXT {
     // sipipe
     SIPIPE_MPL_INFO_CNT              = 1,
     SIPIPE_MPL_CMD_CNT               = 10, 
+    CNLFIT_TXRX_MPL_CNT              = 12,
 };
 
 

@@ -50,6 +50,10 @@ enum tagE_CMN_MPL_RSC_ID {
     CNLCTL_CNLREQ_MPL_ID,
     CNLCTL_CNLEVT_MPL_ID,
 
+    // cnl fit buffer
+    CNLFIT_TXRX_MPL_ID,
+
+
     CMN_MPL_RSC_ID_MAX,
 };
 
